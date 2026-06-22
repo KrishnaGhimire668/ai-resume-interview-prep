@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import '../style/interview.scss'
 import { useInterview } from '../hooks/useInterview'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom' // 🚀 Added useNavigate hook
 
 // ── Nav Items ─────────────────────────────
 const NAV_ITEMS = [
@@ -99,6 +99,7 @@ const RoadMapDay = ({ day }) => (
 // ── Main Component ────────────────────────
 const Interview = () => {
     const [activeNav, setActiveNav] = useState('technical')
+    const navigate = useNavigate() // 🚀 Hook up navigate handler
 
     const {
         report,
@@ -138,6 +139,33 @@ const Interview = () => {
                 {/* ── Left Nav ── */}
                 <nav className='interview-nav'>
                     <div className="nav-content">
+                        
+                        {/* 🚀 NEW: Clean Dark Theme Back Button Arrow */}
+                        <button 
+                            onClick={() => navigate('/')} 
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '4px 0 20px 0',
+                                color: '#a3a3a3',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                width: '100%'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = '#a3a3a3'}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            Back to Setup
+                        </button>
+
                         <p className='interview-nav__label'>Sections</p>
 
                         {NAV_ITEMS.map(item => (

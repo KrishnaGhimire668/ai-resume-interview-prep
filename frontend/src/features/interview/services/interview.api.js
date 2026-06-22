@@ -1,71 +1,61 @@
 import axios from "axios";
 
-const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
-    timeout: 60000, // AI processing is slow; give it 60s before timing out
-    withCredentials: true,
-})
-
-// Global response interceptor for better error debugging
-api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        // Extract meaningful error messages for the UI
-        const message = error.response?.data?.message || error.message || "Something went wrong";
-        console.error("API Error:", message);
-
-        if (error.response?.status === 401) {
-            // Logical place to handle session expiration (e.g., redirect to login)
-        }
-
-        return Promise.reject(error);
-    }
-);
+// Create an axios instance with a base URL configuration
+const API = axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api",
+    timeout: 30000, 
+    withCredentials: true
+});
 
 /**
- * @description Service to generate interview report based on user self description, resume and job description.
+ * Generate a new interview report using job description and resume upload
  */
 export const generateInterviewReport = async ({ jobDescription, selfDescription, resumeFile }) => {
+    const formData = new FormData();
+    formData.append("jobDescription", jobDescription);
+    formData.append("selfDescription", selfDescription);
+    
+    // Only append the file if it exists
+    if (resumeFile) {
+        formData.append("resume", resumeFile);
+    }
 
-    const formData = new FormData()
-    formData.append("jobDescription", jobDescription)
-    formData.append("selfDescription", selfDescription)
-    formData.append("resume", resumeFile)
-
-    const response = await api.post("/api/interview", formData)
-
-    return response.data
-
-}
-
+    const response = await API.post("/interview/generate", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    });
+    return response.data;
+};
 
 /**
- * @description Service to get interview report by interviewId.
+ * Fetch an individual report by its unique MongoDB or Database ID
  */
 export const getInterviewReportById = async (interviewId) => {
-    const response = await api.get(`/api/interview/report/${interviewId}`)
-
-    return response.data
-}
-
+    const response = await API.get(`/interview/report/${interviewId}`);
+    return response.data;
+};
 
 /**
- * @description Service to get all interview reports of logged in user.
+ * Fetch a list of all historical interview reports
  */
 export const getAllInterviewReports = async () => {
-    const response = await api.get("/api/interview")
-
-    return response.data
-}
-
+    const response = await API.get("/interview/reports");
+    return response.data;
+};
 
 /**
- * @description Service to generate resume pdf based on user self description, resume content and job description.
+ * Request server-side generation of a PDF document and return it as a blob
  */
 export const generateResumePdf = async ({ interviewReportId }) => {
-    const response = await api.post(`/api/interview/resume/pdf/${interviewReportId}`, null, {
-        responseType: "blob"
-    })
+    const response = await API.post(
+        `/interview/report/${interviewReportId}/pdf`,
+        {},
+        {
+            responseType: "blob", // CRITICAL: Forces Axios to process the response data as binary streams
+        }
+    );
+    return response.data;
+};
 
-    return response.data
-}
+export default API;
