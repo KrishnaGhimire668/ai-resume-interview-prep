@@ -6,9 +6,11 @@ const tokenBlacklistModel = require("../models/blacklist.model")
 // Centralized cookie configuration
 const cookieOptions = {
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, 
+    maxAge: 24 * 60 * 60 * 1000,
     secure: process.env.NODE_ENV === "production",       // true on Render HTTPS
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax" // allowed across domains
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // allowed across domains
+    path: "/"
+
 }
 
 async function registerUserController(req, res) {
@@ -84,7 +86,7 @@ async function loginUserController(req, res) {
 
     console.log("LOGIN COOKIE SETTING:", token)
     res.cookie("token", token, cookieOptions)
-    
+
     res.status(200).json({
         message: "User loggedIn successfully.",
         user: {
@@ -106,7 +108,8 @@ async function logoutUserController(req, res) {
     res.clearCookie("token", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/"
     })
 
     res.status(200).json({
