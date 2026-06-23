@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000
 
 const api = axios.create({
     baseURL: API_BASE_URL,
-    withCredentials: true
+    withCredentials: true // Crucial for passing HttpOnly JWT cookies cross-origin
 });
 
 export async function register({ username, email, password }) {
@@ -27,7 +27,8 @@ export async function logout() {
         const response = await api.get("/auth/logout"); 
         return response.data;
     } catch (err) {
-        console.log(err);
+        console.error("Logout Error:", err);
+        throw err;
     }
 }
 
@@ -36,6 +37,7 @@ export async function getMe() {
         const response = await api.get("/auth/get-me"); 
         return response.data;
     } catch (err) {
+        // Silently intercept expected initialization failures when anonymous
         if (err.response?.status === 401) {
             return { user: null };
         }
