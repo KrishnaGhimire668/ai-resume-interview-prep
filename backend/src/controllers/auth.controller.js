@@ -81,6 +81,7 @@ async function loginUserController(req, res) {
         { expiresIn: "1d" }
     )
 
+    console.log("LOGIN COOKIE SETTING:", token)
     res.cookie("token", token, cookieOptions)
     
     res.status(200).json({
