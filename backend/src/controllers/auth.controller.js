@@ -3,9 +3,15 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const tokenBlacklistModel = require("../models/blacklist.model")
 
+// Centralized cookie options to handle cross-origin production environments cleanly
+const cookieOptions = {
+    httpOnly: true,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day expiration
+    secure: process.env.NODE_ENV === "production",       // true only when running live on Render HTTPS
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax" // 'none' fixes cross-site blocks
+}
 
 async function registerUserController(req, res) {
-
     const { username, email, password } = req.body
 
     if (!username || !email || !password) {
@@ -38,8 +44,8 @@ async function registerUserController(req, res) {
         { expiresIn: "1d" }
     )
 
-    res.cookie("token", token)
-
+    // Updated with configurations to prevent 401 drop
+    res.cookie("token", token, cookieOptions)
 
     res.status(201).json({
         message: "User registered successfully",
@@ -49,11 +55,9 @@ async function registerUserController(req, res) {
             email: user.email
         }
     })
-
 }
 
 async function loginUserController(req, res) {
-
     const { email, password } = req.body
 
     const user = await userModel.findOne({ email })
@@ -78,7 +82,9 @@ async function loginUserController(req, res) {
         { expiresIn: "1d" }
     )
 
-    res.cookie("token", token)
+    // Updated with configurations to prevent 401 drop
+    res.cookie("token", token, cookieOptions)
+    
     res.status(200).json({
         message: "User loggedIn successfully.",
         user: {
@@ -89,8 +95,6 @@ async function loginUserController(req, res) {
     })
 }
 
-
-
 async function logoutUserController(req, res) {
     const token = req.cookies.token
 
@@ -98,13 +102,13 @@ async function logoutUserController(req, res) {
         await tokenBlacklistModel.create({ token })
     }
 
-    res.clearCookie("token")
+    // Pass options during cleanup so the browser targets the exact same cookie scope
+    res.clearCookie("token", cookieOptions)
 
     res.status(200).json({
         message: "User logged out successfully"
     })
 }
-
 
 async function getMeController(req, res) {
     const user = await userModel.findById(req.user.id)
@@ -116,9 +120,7 @@ async function getMeController(req, res) {
             email: user.email
         }
     })
-
 }
-
 
 module.exports = {
     registerUserController,
