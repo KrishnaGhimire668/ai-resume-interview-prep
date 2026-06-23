@@ -5,42 +5,45 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000
 
 const api = axios.create({
     baseURL: API_BASE_URL,
-    withCredentials: true // Crucial for passing HttpOnly JWT cookies cross-origin
+    withCredentials: true
 });
 
-export async function register({ username, email, password }) {
-    const response = await api.post('/auth/register', { 
-        username, email, password
-    });
+// 1. Fetch all interview reports
+export async function getAllInterviewReports() {
+    const response = await api.get("/interview/reports");
     return response.data;
 }
 
-export async function login({ email, password }) {
-    const response = await api.post("/auth/login", { 
-        email, password
-    });
-    return response.data;
-}
-
-export async function logout() {
-    try {
-        const response = await api.get("/auth/logout"); 
-        return response.data;
-    } catch (err) {
-        console.error("Logout Error:", err);
-        throw err;
+// 2. Generate a new interview report
+// FIXED: Explicitly named and exported so useInterview.jsx doesn't fail the build
+export async function generateInterviewReport({ jobDescription, selfDescription, resumeFile }) {
+    // Handling form data since dealing with text fields and file uploads
+    const formData = new FormData();
+    formData.append("jobDescription", jobDescription);
+    formData.append("selfDescription", selfDescription);
+    
+    if (resumeFile) {
+        formData.append("resumeFile", resumeFile);
     }
-}
 
-export async function getMe() {
-    try {
-        const response = await api.get("/auth/get-me"); 
-        return response.data;
-    } catch (err) {
-        // Silently intercept expected initialization failures when anonymous
-        if (err.response?.status === 401) {
-            return { user: null };
+    const response = await api.post("/interview/generate", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data"
         }
-        throw err;
-    }
+    });
+    return response.data;
+}
+
+// 3. Fetch a single interview report by ID
+export async function getInterviewReportById(id) {
+    const response = await api.get(`/interview/report/${id}`);
+    return response.data;
+}
+
+// 4. Generate/Download the Resume PDF
+export async function generateResumePdf({ interviewReportId }) {
+    const response = await api.get(`/interview/report/${interviewReportId}/pdf`, {
+        responseType: "blob" // Crucial for structural binary processing
+    });
+    return response.data;
 }
