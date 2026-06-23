@@ -8,18 +8,21 @@ const interviewReportModel = require("../models/interviewReport.model")
 async function generateInterViewReportController(req, res) {
     try {
 
-        // SAFETY CHECK 
-        if (!req.file) {
+        const { selfDescription, jobDescription } = req.body
+
+        // SAFETY CHECK - require either a resume file OR a self description
+        if (!req.file && !selfDescription) {
             return res.status(400).json({
-                message: "Resume file is required"
+                message: "Either a resume file or a self description is required"
             })
         }
 
-        const { selfDescription, jobDescription } = req.body
-
-        // CORRECT pdf-parse usage
-        const data = await pdfParse(req.file.buffer)
-        const resumeContent = data.text
+        // Only parse PDF if a resume file was actually uploaded
+        let resumeContent = ""
+        if (req.file) {
+            const data = await pdfParse(req.file.buffer)
+            resumeContent = data.text
+        }
 
         const interViewReportByAi = await generateInterviewReport({
             resume: resumeContent,
