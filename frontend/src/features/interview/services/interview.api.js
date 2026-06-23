@@ -15,23 +15,17 @@ export async function getAllInterviewReports() {
 }
 
 // 2. Generate a new interview report
-// FIXED: Explicitly named and exported so useInterview.jsx doesn't fail the build
 export async function generateInterviewReport({ jobDescription, selfDescription, resumeFile }) {
-    // Handling form data since dealing with text fields and file uploads
-    const formData = new FormData();
-    formData.append("jobDescription", jobDescription);
-    formData.append("selfDescription", selfDescription);
-    
+    const formData = new FormData()
+    formData.append("jobDescription", jobDescription)
+    formData.append("selfDescription", selfDescription)
+
     if (resumeFile) {
-        formData.append("resumeFile", resumeFile);
+        formData.append("resume", resumeFile)
     }
 
-    const response = await api.post("/interview/generate", formData, {
-        headers: {
-            "Content-Type": "multipart/form-data"
-        }
-    });
-    return response.data;
+    const response = await api.post("/interview/generate", formData)
+    return response.data
 }
 
 // 3. Fetch a single interview report by ID
