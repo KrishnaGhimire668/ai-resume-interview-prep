@@ -3,12 +3,12 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const tokenBlacklistModel = require("../models/blacklist.model")
 
-// Centralized cookie options to handle cross-origin production environments cleanly
+// Centralized cookie configuration
 const cookieOptions = {
     httpOnly: true,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day expiration
-    secure: process.env.NODE_ENV === "production",       // true only when running live on Render HTTPS
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax" // 'none' fixes cross-site blocks
+    maxAge: 24 * 60 * 60 * 1000, 
+    secure: process.env.NODE_ENV === "production",       // true on Render HTTPS
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax" // allowed across domains
 }
 
 async function registerUserController(req, res) {
@@ -44,7 +44,6 @@ async function registerUserController(req, res) {
         { expiresIn: "1d" }
     )
 
-    // Updated with configurations to prevent 401 drop
     res.cookie("token", token, cookieOptions)
 
     res.status(201).json({
@@ -82,7 +81,6 @@ async function loginUserController(req, res) {
         { expiresIn: "1d" }
     )
 
-    // Updated with configurations to prevent 401 drop
     res.cookie("token", token, cookieOptions)
     
     res.status(200).json({
@@ -102,8 +100,12 @@ async function logoutUserController(req, res) {
         await tokenBlacklistModel.create({ token })
     }
 
-    // Pass options during cleanup so the browser targets the exact same cookie scope
-    res.clearCookie("token", cookieOptions)
+    // FIX: Clear the cookie explicitly matching domain scope, but without maxAge/expires properties
+    res.clearCookie("token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+    })
 
     res.status(200).json({
         message: "User logged out successfully"
