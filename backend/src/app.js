@@ -8,14 +8,8 @@ app.use(express.json())
 app.use(cookieParser())
 
 app.use(cors({
-    origin: "https://career-ai-web-3a4v.onrender.com",
-    credentials: true
-}))
-
-// (optional but recommended for preflight requests)
-app.options("*", cors({
-    origin: "https://career-ai-web-3a4v.onrender.com",
-    credentials: true
+  origin: "https://career-ai-web-3a4v.onrender.com",
+  credentials: true
 }))
 
 const authRouter = require("./routes/auth.routes")
