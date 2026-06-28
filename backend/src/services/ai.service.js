@@ -1,11 +1,11 @@
-const { GoogleGenAI } = require("@google/genai")
-const { z } = require("zod")
-const { zodToJsonSchema } = require("zod-to-json-schema")
-const PDFDocument = require("pdfkit")
+const { GoogleGenAI } = require("@google/genai");
+const { z } = require("zod");
+const { zodToJsonSchema } = require("zod-to-json-schema");
+const PDFDocument = require("pdfkit");
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GOOGLE_GENAI_API_KEY
-})
+});
 
 const interviewReportSchema = z.object({
     matchScore: z.number().describe("A score between 0 and 100 indicating how well the candidate's profile matches the job describe"),
@@ -29,15 +29,14 @@ const interviewReportSchema = z.object({
         tasks: z.array(z.string()).describe("List of tasks to be done on this day to follow the preparation plan, e.g. read a specific book or article, solve a set of problems, watch a video etc.")
     })).describe("A day-wise preparation plan for the candidate to follow in order to prepare for the interview effectively"),
     title: z.string().describe("The title of the job for which the interview report is generated"),
-})
+});
 
 async function generateInterviewReport({ resume, selfDescription, jobDescription }) {
     const prompt = `Generate an interview report for a candidate with the following details:
                         Resume: ${resume}
                         Self Description: ${selfDescription}
                         Job Description: ${jobDescription}
-`
-
+`;
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -45,58 +44,91 @@ async function generateInterviewReport({ resume, selfDescription, jobDescription
             responseMimeType: "application/json",
             responseSchema: zodToJsonSchema(interviewReportSchema),
         }
-    })
-
-    return JSON.parse(response.text)
+    });
+    return JSON.parse(response.text);
 }
 
 /**
- * @description Generates a pure binary PDF buffer out of plain text fields using PDFKit 
+ * Modern Executive Resume PDF Generator
  */
-async function generatePdfFromText(structuredContent) {
+async function generatePdfFromText(data) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({
             size: "A4",
-            margin: 40
+            margin: 50,
+            bufferPages: true
         });
 
         let buffers = [];
         doc.on("data", buffers.push.bind(buffers));
-        doc.on("end", () => {
-            let pdfData = Buffer.concat(buffers);
-            resolve(pdfData);
-        });
-        doc.on("error", (err) => reject(err));
+        doc.on("end", () => resolve(Buffer.concat(buffers)));
+        doc.on("error", reject);
 
-        // Document Header / Title
-        doc.fillColor("#1e293b").fontSize(24).text(structuredContent.name || "Tailored Resume", { align: "center" });
-        doc.fontSize(10).fillColor("#64748b").text(structuredContent.contactInfo || "", { align: "center" });
-        doc.moveDown(1.5);
+        const pageWidth = doc.page.width - 100;
 
-        // Summary Section
-        if (structuredContent.summary) {
-            doc.fillColor("#0f172a").fontSize(14).text("Professional Summary");
-            doc.strokeColor("#cbd5e1").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-            doc.moveDown(0.5);
-            doc.fillColor("#334155").fontSize(10).text(structuredContent.summary, { align: "justify" });
-            doc.moveDown(1.5);
+        // Header
+        doc.fillColor("#1e293b")
+           .fontSize(28)
+           .font("Helvetica-Bold")
+           .text(data.name || "Candidate Name", { align: "center" });
+
+        doc.moveDown(0.5);
+        doc.fillColor("#64748b")
+           .fontSize(11)
+           .font("Helvetica")
+           .text(data.contactInfo || "", { align: "center" });
+
+        doc.moveDown(2);
+
+        // Professional Summary
+        if (data.summary) {
+            doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text("PROFESSIONAL SUMMARY");
+            doc.moveDown(0.4);
+            doc.strokeColor("#e2e8f0").lineWidth(2)
+               .moveTo(50, doc.y).lineTo(pageWidth + 50, doc.y).stroke();
+
+            doc.moveDown(0.8);
+            doc.fillColor("#334155").fontSize(10.8).font("Helvetica")
+               .text(data.summary, { align: "justify", lineGap: 2 });
+            doc.moveDown(2);
         }
 
-        // Core Experience
-        if (structuredContent.experience) {
-            doc.fillColor("#0f172a").fontSize(14).text("Professional Experience");
-            doc.strokeColor("#cbd5e1").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-            doc.moveDown(0.5);
-            doc.fillColor("#334155").fontSize(10).text(structuredContent.experience, { align: "left" });
-            doc.moveDown(1.5);
+        // Experience
+        if (data.experience) {
+            doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text("PROFESSIONAL EXPERIENCE");
+            doc.moveDown(0.4);
+            doc.strokeColor("#e2e8f0").lineWidth(2)
+               .moveTo(50, doc.y).lineTo(pageWidth + 50, doc.y).stroke();
+
+            doc.moveDown(0.8);
+            doc.fillColor("#334155").fontSize(10.5).font("Helvetica")
+               .text(data.experience, { align: "left", lineGap: 4, paragraphGap: 10 });
+            doc.moveDown(2);
         }
 
-        // Skills Matrix
-        if (structuredContent.skills) {
-            doc.fillColor("#0f172a").fontSize(14).text("Technical Skills");
-            doc.strokeColor("#cbd5e1").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-            doc.moveDown(0.5);
-            doc.fillColor("#334155").fontSize(10).text(structuredContent.skills, { align: "left" });
+        // Skills
+        if (data.skills) {
+            doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text("TECHNICAL SKILLS");
+            doc.moveDown(0.4);
+            doc.strokeColor("#e2e8f0").lineWidth(2)
+               .moveTo(50, doc.y).lineTo(pageWidth + 50, doc.y).stroke();
+
+            doc.moveDown(0.8);
+            doc.fillColor("#334155").fontSize(10.5).font("Helvetica")
+               .text(data.skills, { align: "left", lineGap: 3 });
+            doc.moveDown(2);
+        }
+
+        // Education
+        if (data.education) {
+            doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text("EDUCATION");
+            doc.moveDown(0.4);
+            doc.strokeColor("#e2e8f0").lineWidth(2)
+               .moveTo(50, doc.y).lineTo(pageWidth + 50, doc.y).stroke();
+
+            doc.moveDown(0.8);
+            doc.fillColor("#334155").fontSize(10.5).font("Helvetica")
+               .text(data.education, { align: "left", lineGap: 3 });
         }
 
         doc.end();
@@ -104,21 +136,32 @@ async function generatePdfFromText(structuredContent) {
 }
 
 async function generateResumePdf({ resume, selfDescription, jobDescription }) {
-    // We update the schema to prompt Gemini for pure markdown/text keys instead of tricky HTML
     const resumeSchema = z.object({
         name: z.string().describe("Candidate full name"),
-        contactInfo: z.string().describe("Email, Phone, Location, Portfolio Links separated by pipes |"),
-        summary: z.string().describe("An ATS-friendly professional summary optimized specifically for the target job"),
-        experience: z.string().describe("Detailed professional experience section containing jobs, titles, dates, and metric-driven bullet points"),
-        skills: z.string().describe("Clean categorized list of relevant technical and soft skills matching the job description")
-    })
+        contactInfo: z.string().describe("Email, Phone, Location, LinkedIn, Portfolio separated by |"),
+        summary: z.string().describe("Strong ATS-friendly professional summary (under 70 words)"),
+        experience: z.string().describe("Detailed experience section with job titles, companies, dates, and strong bullet points"),
+        skills: z.string().describe("Well-categorized technical and relevant skills"),
+        education: z.string().optional().describe("Education: Degree, University, Graduation Year, etc.")
+    });
 
-    const prompt = `Generate an ATS-optimized resume based on these inputs:
-                        Resume: ${resume}
-                        Self Description: ${selfDescription}
-                        Job Description: ${jobDescription}
+    const prompt = `
+Create a modern, ATS-optimized, and highly professional resume.
 
-                        Highlight the candidate's technical strengths matching the job description. The experience bullet points should sound real, professional, and written by a human. Make it highly competitive.`
+Resume: ${resume}
+Self Description: ${selfDescription}
+Job Description: ${jobDescription}
+
+Rules:
+- Strongly tailor the resume to the target job.
+- Use confident, executive-level language.
+- Quantify achievements wherever possible.
+- Keep summary under 70 words.
+- Each role should have 3–5 strong bullet points.
+- Categorize skills clearly (Languages, Frameworks, Tools, etc.).
+- Include education section.
+- Return ONLY valid JSON matching the schema. No extra text.
+`;
 
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -127,14 +170,11 @@ async function generateResumePdf({ resume, selfDescription, jobDescription }) {
             responseMimeType: "application/json",
             responseSchema: zodToJsonSchema(resumeSchema),
         }
-    })
+    });
 
-    const structuredContent = JSON.parse(response.text)
-    
-    // Pass clean object straight into native memory-safe compiler engine
-    const pdfBuffer = await generatePdfFromText(structuredContent)
-
-    return pdfBuffer
+    const structuredContent = JSON.parse(response.text);
+    const pdfBuffer = await generatePdfFromText(structuredContent);
+    return pdfBuffer;
 }
 
-module.exports = { generateInterviewReport, generateResumePdf }
+module.exports = { generateInterviewReport, generateResumePdf };
