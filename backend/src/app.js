@@ -9,7 +9,9 @@ app.use(cookieParser())
 
 app.use(cors({
   origin: "https://career-ai-web-3a4v.onrender.com",
-  credentials: true
+  credentials: true,
+  // Allows your decoupled frontend to read file headers like file names and sizes
+  exposedHeaders: ["Content-Disposition"] 
 }))
 
 const authRouter = require("./routes/auth.routes")
