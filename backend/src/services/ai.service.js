@@ -1,12 +1,11 @@
 const { GoogleGenAI } = require("@google/genai")
 const { z } = require("zod")
 const { zodToJsonSchema } = require("zod-to-json-schema")
-const puppeteer = require("puppeteer")
+const PDFDocument = require("pdfkit")
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GOOGLE_GENAI_API_KEY
 })
-
 
 const interviewReportSchema = z.object({
     matchScore: z.number().describe("A score between 0 and 100 indicating how well the candidate's profile matches the job describe"),
@@ -33,8 +32,6 @@ const interviewReportSchema = z.object({
 })
 
 async function generateInterviewReport({ resume, selfDescription, jobDescription }) {
-
-
     const prompt = `Generate an interview report for a candidate with the following details:
                         Resume: ${resume}
                         Self Description: ${selfDescription}
@@ -51,66 +48,93 @@ async function generateInterviewReport({ resume, selfDescription, jobDescription
     })
 
     return JSON.parse(response.text)
-
-
 }
 
+/**
+ * @description Generates a pure binary PDF buffer out of plain text fields using PDFKit 
+ */
+async function generatePdfFromText(structuredContent) {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({
+            size: "A4",
+            margin: 40
+        });
 
+        let buffers = [];
+        doc.on("data", buffers.push.bind(buffers));
+        doc.on("end", () => {
+            let pdfData = Buffer.concat(buffers);
+            resolve(pdfData);
+        });
+        doc.on("error", (err) => reject(err));
 
-async function generatePdfFromHtml(htmlContent) {
-    const browser = await puppeteer.launch()
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" })
+        // Document Header / Title
+        doc.fillColor("#1e293b").fontSize(24).text(structuredContent.name || "Tailored Resume", { align: "center" });
+        doc.fontSize(10).fillColor("#64748b").text(structuredContent.contactInfo || "", { align: "center" });
+        doc.moveDown(1.5);
 
-    const pdfBuffer = await page.pdf({
-        format: "A4", margin: {
-            top: "20mm",
-            bottom: "20mm",
-            left: "15mm",
-            right: "15mm"
+        // Summary Section
+        if (structuredContent.summary) {
+            doc.fillColor("#0f172a").fontSize(14).text("Professional Summary");
+            doc.strokeColor("#cbd5e1").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+            doc.moveDown(0.5);
+            doc.fillColor("#334155").fontSize(10).text(structuredContent.summary, { align: "justify" });
+            doc.moveDown(1.5);
         }
-    })
 
-    await browser.close()
+        // Core Experience
+        if (structuredContent.experience) {
+            doc.fillColor("#0f172a").fontSize(14).text("Professional Experience");
+            doc.strokeColor("#cbd5e1").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+            doc.moveDown(0.5);
+            doc.fillColor("#334155").fontSize(10).text(structuredContent.experience, { align: "left" });
+            doc.moveDown(1.5);
+        }
 
-    return pdfBuffer
+        // Skills Matrix
+        if (structuredContent.skills) {
+            doc.fillColor("#0f172a").fontSize(14).text("Technical Skills");
+            doc.strokeColor("#cbd5e1").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+            doc.moveDown(0.5);
+            doc.fillColor("#334155").fontSize(10).text(structuredContent.skills, { align: "left" });
+        }
+
+        doc.end();
+    });
 }
 
 async function generateResumePdf({ resume, selfDescription, jobDescription }) {
-
-    const resumePdfSchema = z.object({
-        html: z.string().describe("The HTML content of the resume which can be converted to PDF using any library like puppeteer")
+    // We update the schema to prompt Gemini for pure markdown/text keys instead of tricky HTML
+    const resumeSchema = z.object({
+        name: z.string().describe("Candidate full name"),
+        contactInfo: z.string().describe("Email, Phone, Location, Portfolio Links separated by pipes |"),
+        summary: z.string().describe("An ATS-friendly professional summary optimized specifically for the target job"),
+        experience: z.string().describe("Detailed professional experience section containing jobs, titles, dates, and metric-driven bullet points"),
+        skills: z.string().describe("Clean categorized list of relevant technical and soft skills matching the job description")
     })
 
-    const prompt = `Generate resume for a candidate with the following details:
+    const prompt = `Generate an ATS-optimized resume based on these inputs:
                         Resume: ${resume}
                         Self Description: ${selfDescription}
                         Job Description: ${jobDescription}
 
-                        the response should be a JSON object with a single field "html" which contains the HTML content of the resume which can be converted to PDF using any library like puppeteer.
-                        The resume should be tailored for the given job description and should highlight the candidate's strengths and relevant experience. The HTML content should be well-formatted and structured, making it easy to read and visually appealing.
-                        The content of resume should be not sound like it's generated by AI and should be as close as possible to a real human-written resume.
-                        you can highlight the content using some colors or different font styles but the overall design should be simple and professional.
-                        The content should be ATS friendly, i.e. it should be easily parsable by ATS systems without losing important information.
-                        The resume should not be so lengthy, it should ideally be 1-2 pages long when converted to PDF. Focus on quality rather than quantity and make sure to include all the relevant information that can increase the candidate's chances of getting an interview call for the given job description.
-                    `
+                        Highlight the candidate's technical strengths matching the job description. The experience bullet points should sound real, professional, and written by a human. Make it highly competitive.`
 
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
-            responseSchema: zodToJsonSchema(resumePdfSchema),
+            responseSchema: zodToJsonSchema(resumeSchema),
         }
     })
 
-
-    const jsonContent = JSON.parse(response.text)
-
-    const pdfBuffer = await generatePdfFromHtml(jsonContent.html)
+    const structuredContent = JSON.parse(response.text)
+    
+    // Pass clean object straight into native memory-safe compiler engine
+    const pdfBuffer = await generatePdfFromText(structuredContent)
 
     return pdfBuffer
-
 }
 
 module.exports = { generateInterviewReport, generateResumePdf }
